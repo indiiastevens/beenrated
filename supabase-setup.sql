@@ -13,20 +13,38 @@ create table public.courses (
 );
 
 create table public.reviews (
-  id          uuid primary key default gen_random_uuid(),
-  course_id   text not null references public.courses(id) on delete cascade,
-  user_id     uuid not null references auth.users(id) on delete cascade,
-  year        text not null check (year in ('1st year','2nd year','3rd year','4th year','Grad student')),
-  difficulty  smallint not null check (difficulty between 1 and 5),
-  work        smallint not null check (work between 1 and 5),
-  exams       smallint not null check (exams between 1 and 5),
-  attendance  smallint not null check (attendance between 1 and 5),
-  again       smallint not null check (again between 1 and 5),
-  body        text not null check (char_length(body) between 1 and 500),
-  useful      text not null default '' check (char_length(useful) <= 100),
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now(),
-  unique (course_id, user_id)               -- one review per person per class
+  id               uuid primary key default gen_random_uuid(),
+  course_id        text not null references public.courses(id) on delete cascade,
+  user_id          uuid not null references auth.users(id) on delete cascade,
+  year             text check (year in ('1st year','2nd year','3rd year','4th year','Grad student')),
+  -- 1-5 scales, all optional
+  again            smallint check (again between 1 and 5),
+  taught           smallint check (taught between 1 and 5),
+  interesting      smallint check (interesting between 1 and 5),
+  hours            smallint check (hours between 1 and 5),        -- 1 = 0-2h, 2 = 3-5h, 3 = 6-8h, 4 = 9-12h, 5 = 13h+
+  workload         smallint check (workload between 1 and 5),
+  assessment       smallint check (assessment between 1 and 5),
+  attendance       smallint check (attendance between 1 and 5),
+  -- optional descriptions
+  hours_note       text not null default '' check (char_length(hours_note) <= 300),
+  workload_note    text not null default '' check (char_length(workload_note) <= 300),
+  assessment_note  text not null default '' check (char_length(assessment_note) <= 300),
+  attendance_note  text not null default '' check (char_length(attendance_note) <= 300),
+  -- yes / no questions (null = not answered)
+  group_work       boolean,
+  background       boolean,
+  background_note  text not null default '' check (char_length(background_note) <= 300),
+  -- why they took it
+  reasons          text[] not null default '{}' check (cardinality(reasons) <= 6),
+  reason_note      text not null default '' check (char_length(reason_note) <= 200),
+  -- in their words
+  body             text not null default '' check (char_length(body) <= 500),
+  useful           text not null default '' check (char_length(useful) <= 100),
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now(),
+  unique (course_id, user_id),                                       -- one review per person per class
+  check (num_nonnulls(again, taught, interesting, hours, workload, assessment, attendance, group_work, background) > 0
+         or char_length(body) > 0)                                    -- not completely empty
 );
 
 -- ---------- Who counts as a Duke student ----------
@@ -63,30 +81,44 @@ alter table public.reviews enable row level security;
 revoke all on public.reviews from anon, authenticated;
 
 create view public.public_reviews as
-  select id, course_id, year, difficulty, work, exams, attendance, again,
+  select id, course_id, year, again, taught, interesting, hours, workload, assessment, attendance,
+         hours_note, workload_note, assessment_note, attendance_note,
+         group_work, background, background_note, reasons, reason_note,
          body, useful, created_at, updated_at,
          (user_id = auth.uid()) as mine
   from public.reviews;
 
 grant select on public.public_reviews to anon, authenticated;
 
-create or replace function public.submit_review(
-  p_course_id text, p_year text,
-  p_difficulty int, p_work int, p_exams int, p_attendance int, p_again int,
-  p_body text, p_useful text
-) returns void
+create or replace function public.submit_review(p_course_id text, p jsonb)
+returns void
 language plpgsql security definer set search_path = public
 as $$
 begin
   if auth.uid() is null or not public.is_duke() then
     raise exception 'Sign in with your duke.edu email to post.';
   end if;
-  insert into public.reviews (course_id, user_id, year, difficulty, work, exams, attendance, again, body, useful)
-  values (p_course_id, auth.uid(), p_year, p_difficulty, p_work, p_exams, p_attendance, p_again,
-          trim(p_body), coalesce(trim(p_useful), ''))
+  insert into public.reviews (
+    course_id, user_id, year, again, taught, interesting, hours, workload, assessment, attendance,
+    hours_note, workload_note, assessment_note, attendance_note,
+    group_work, background, background_note, reasons, reason_note, body, useful)
+  values (
+    p_course_id, auth.uid(), nullif(p->>'year', ''),
+    (p->>'again')::smallint, (p->>'taught')::smallint, (p->>'interesting')::smallint,
+    (p->>'hours')::smallint, (p->>'workload')::smallint, (p->>'assessment')::smallint, (p->>'attendance')::smallint,
+    coalesce(trim(p->>'hours_note'), ''), coalesce(trim(p->>'workload_note'), ''),
+    coalesce(trim(p->>'assessment_note'), ''), coalesce(trim(p->>'attendance_note'), ''),
+    (p->>'group_work')::boolean, (p->>'background')::boolean, coalesce(trim(p->>'background_note'), ''),
+    coalesce(array(select jsonb_array_elements_text(coalesce(p->'reasons', '[]'::jsonb))), '{}'),
+    coalesce(trim(p->>'reason_note'), ''),
+    coalesce(trim(p->>'body'), ''), coalesce(trim(p->>'useful'), ''))
   on conflict (course_id, user_id) do update set
-    year = excluded.year, difficulty = excluded.difficulty, work = excluded.work,
-    exams = excluded.exams, attendance = excluded.attendance, again = excluded.again,
+    year = excluded.year, again = excluded.again, taught = excluded.taught, interesting = excluded.interesting,
+    hours = excluded.hours, workload = excluded.workload, assessment = excluded.assessment, attendance = excluded.attendance,
+    hours_note = excluded.hours_note, workload_note = excluded.workload_note,
+    assessment_note = excluded.assessment_note, attendance_note = excluded.attendance_note,
+    group_work = excluded.group_work, background = excluded.background, background_note = excluded.background_note,
+    reasons = excluded.reasons, reason_note = excluded.reason_note,
     body = excluded.body, useful = excluded.useful, updated_at = now();
 end;
 $$;
@@ -100,7 +132,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.submit_review(text,text,int,int,int,int,int,text,text) from public, anon;
+revoke execute on function public.submit_review(text, jsonb) from public, anon;
 revoke execute on function public.delete_my_review(text) from public, anon;
-grant execute on function public.submit_review(text,text,int,int,int,int,int,text,text) to authenticated;
+grant execute on function public.submit_review(text, jsonb) to authenticated;
 grant execute on function public.delete_my_review(text) to authenticated;

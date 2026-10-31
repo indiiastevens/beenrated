@@ -144,6 +144,49 @@ footer{font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padd
 @media (prefers-reduced-motion:no-preference){.item,.btn{transition:background .15s,border-color .15s}}
 .auth{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .who-am-i{font-size:13px;color:var(--muted)}
+
+/* dot scales */
+.dots{display:inline-flex;gap:4px;align-items:center;--dc:var(--ink)}
+.dots.eval{--dc:var(--accent)}
+.dots i{width:11px;height:11px;border-radius:50%;background:linear-gradient(90deg,var(--dc) var(--f),var(--star-off) var(--f))}
+.dots.lg{gap:6px}.dots.lg i{width:15px;height:15px}
+.measures .label{display:block;padding:10px 0 2px}
+.measure{grid-template-columns:minmax(0,1fr) auto 70px}
+.measure .name small{font-size:12px}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.fact{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;font-size:14px;min-width:0}
+.useful b{font-weight:600;color:var(--muted);margin-left:2px}
+.flags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.flag{font-size:12px;border-radius:999px;padding:1px 8px;background:color-mix(in srgb,var(--good) 13%,transparent);color:var(--good);font-weight:500}
+.minival{display:flex;gap:8px;align-items:center}
+.minival b{font-size:12px;color:var(--ink)}
+.notes{margin:0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.notes div{display:grid;grid-template-columns:120px minmax(0,1fr);gap:10px}
+.notes dt{color:var(--muted);font-size:12.5px;padding-top:1px}
+.notes dd{margin:0;overflow-wrap:anywhere}
+@media (max-width:480px){.notes div{grid-template-columns:minmax(0,1fr);gap:0}}
+/* review form */
+fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;min-width:0}
+legend{padding:0 0 4px}
+.qrow{display:flex;flex-direction:column;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}
+.qrow:last-child{border-bottom:0}
+.qhead{display:grid;grid-template-columns:minmax(0,1fr) auto 64px;gap:8px 16px;align-items:center}
+.qname{font-weight:500}
+.qpick{display:flex;flex-direction:column;gap:4px}
+.qval{font-size:13px;color:var(--muted);text-align:right}
+.dotpick{display:inline-flex;gap:8px}
+.dotpick input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.dotpick label{width:26px;height:26px;border-radius:50%;background:var(--star-off);cursor:pointer;position:relative}
+.dotpick.eval label.on{background:var(--accent)}
+.dotpick.desc label.on{background:var(--ink)}
+.dotpick input:focus-visible+label{outline:2px solid var(--accent);outline-offset:2px}
+.qpick .ends{width:162px;max-width:none}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.yn{display:flex;gap:6px}
+.linkbtn{align-self:flex-start;border:0;background:none;color:var(--accent);padding:0;cursor:pointer;font-size:13.5px;font-weight:500}
+.note{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:9px 11px;width:100%;box-sizing:border-box;font-size:14px}
+textarea.note{min-height:64px;resize:vertical}
+@media (max-width:520px){.qhead{grid-template-columns:minmax(0,1fr) auto}.qhead .qname{grid-column:1/-1}.qval{text-align:left}}
 </style>
 </head>
 <body>
@@ -159,35 +202,51 @@ footer{font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padd
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script>
-const MEASURES=[
-  {k:"difficulty",label:"General difficulty",lo:"1 = easy",hi:"5 = very hard"},
-  {k:"work",label:"Work heavy",lo:"1 = light",hi:"5 = heavy workload"},
-  {k:"exams",label:"Exam heavy",lo:"1 = few or no exams",hi:"5 = mostly exams"},
-  {k:"attendance",label:"Attendance required",lo:"1 = optional",hi:"5 = mandatory"},
-  {k:"again",label:"Would take again",lo:"1 = no way",hi:"5 = definitely"}];
+const RATINGS=[
+  {k:"again",label:"Would take again",lo:"No way",hi:"Definitely",kind:"eval"},
+  {k:"taught",label:"Well taught",lo:"Poorly",hi:"Brilliantly",kind:"eval"},
+  {k:"interesting",label:"Actually interesting",lo:"Dull",hi:"Fascinating",kind:"eval"},
+  {k:"hours",label:"Hours per week",lo:"0–2 hrs",hi:"13+ hrs",kind:"desc",note:"hours_note",noteLabel:"Typical week",ph:"What does a normal week look like? e.g. 2 hrs reading, a problem set most weeks"},
+  {k:"workload",label:"Workload",lo:"Light",hi:"Heavy",kind:"desc",note:"workload_note",noteLabel:"Kind of work",ph:"What kind of work? e.g. weekly problem sets, 50 pages of reading"},
+  {k:"assessment",label:"Assessment",lo:"Light",hi:"Heavy",kind:"desc",note:"assessment_note",noteLabel:"Assessment",ph:"What types? e.g. two midterms and a final, one research paper"},
+  {k:"attendance",label:"Attendance",lo:"Optional",hi:"Mandatory",kind:"desc",note:"attendance_note",noteLabel:"Attendance",ph:"e.g. attendance taken in sections, participation is 10%"}];
+const HOURS=["0–2","3–5","6–8","9–12","13+"];
+const hoursLabel=v=>v==null?"–":HOURS[Math.min(4,Math.max(0,Math.round(v)-1))]+" hrs";
+const REASONS=["Major","Minor","A&S requirement","Elective / interest","Recommended to me"];
 const ATTRS=[["CE","Creating and Engaging with Art","Art"],["HI","Humanistic Inquiry","Humanities"],["IJ","Interpreting Institutions, Justice and Power","Institutions & power"],
   ["NW","Investigating the Natural World","Natural world"],["QC","Quantitative and Computational Reasoning","Quantitative"],["SB","Social and Behavioral Analysis","Social & behavioral"],
   ["WR","Writing","Writing"],["LANG","Counts toward a language pathway","Language"],["CENTURY","Two Century course","Century"]];
 const attrName=a=>{const x=ATTRS.find(y=>y[0]===a);return x?x[1]:a};
 const attrBadge=a=>a==="LANG"?"Language":a==="CENTURY"?"Century":a;
 const YEARS=["1st year","2nd year","3rd year","4th year","Grad student"];
+const QUICK=[
+  {id:"light-hours",label:"5 hrs/wk or less",test:s=>s.m.hours!=null&&s.m.hours<=2.4},
+  {id:"light-assess",label:"Light assessment",test:s=>s.m.assessment!=null&&s.m.assessment<=2.4},
+  {id:"no-attendance",label:"Attendance optional",test:s=>s.m.attendance!=null&&s.m.attendance<=2.4},
+  {id:"no-group",label:"No group work",test:s=>!!s.group&&s.group.yes/s.group.n<0.5},
+  {id:"no-background",label:"No background needed",test:s=>!!s.bg&&s.bg.yes/s.bg.n<0.5}];
 
 const cfg=window.BEENRATED_CONFIG||{};
 const configured=cfg.url&&!/PASTE/.test(cfg.url)&&cfg.anonKey&&!/PASTE/.test(cfg.anonKey);
 const sb=configured&&window.supabase?window.supabase.createClient(cfg.url,cfg.anonKey):null;
 
-const S={session:null,loaded:false,loadError:"",courses:new Map(),reviews:new Map(),q:"",attr:"All",sort:"count",editing:false,flash:""};
+const S={session:null,loaded:false,loadError:"",courses:new Map(),reviews:new Map(),q:"",attr:"All",quick:new Set(),sort:"count",editing:false,flash:""};
 const app=document.getElementById("app");
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
 const f1=v=>v==null?"–":v.toFixed(1);
-const stars=v=>`<span class="stars" style="--p:${v==null?0:v/5*100}%" aria-label="${f1(v)} out of 5">★★★★★</span>`;
 const againColor=v=>v==null?"var(--muted)":v>=4?"var(--good)":v>=3?"var(--mid)":"var(--bad)";
 const email=()=>S.session?.user?.email||"";
 const isDuke=()=>/@duke\.edu$/i.test(email());
 const canWrite=()=>!!(sb&&S.session&&isDuke());
 function lastYear(){try{return localStorage.getItem("br-year")||""}catch(e){return""}}
-function saveYear(y){try{localStorage.setItem("br-year",y)}catch(e){}}
+function saveYear(y){try{if(y)localStorage.setItem("br-year",y)}catch(e){}}
+function dots(v,kind,cls=""){
+  let h=`<span class="dots ${kind} ${cls}" role="img" aria-label="${v==null?"No rating":f1(v)+" out of 5"}">`;
+  for(let i=0;i<5;i++){const f=v==null?0:Math.max(0,Math.min(1,v-i));h+=`<i style="--f:${Math.round(f*100)}%"></i>`}
+  return h+"</span>";
+}
+const valText=(k,v)=>k==="hours"?hoursLabel(v):f1(v);
 
 /* ---------- data ---------- */
 async function loadAll(){
@@ -204,8 +263,10 @@ async function loadAll(){
 const reviewsFor=cid=>S.reviews.get(cid)||[];
 function summary(cid){
   const rs=reviewsFor(cid),m={};
-  MEASURES.forEach(x=>m[x.k]=avg(rs.map(r=>Number(r[x.k])).filter(n=>n>=1&&n<=5)));
-  return {n:rs.length,m,rs};
+  RATINGS.forEach(x=>{const a=rs.map(r=>r[x.k]).filter(n=>n>=1&&n<=5);m[x.k]=avg(a);m[x.k+"_n"]=a.length});
+  const yn=k=>{const a=rs.filter(r=>typeof r[k]==="boolean");return a.length?{yes:a.filter(r=>r[k]).length,n:a.length}:null};
+  const reasons={};rs.forEach(r=>(r.reasons||[]).forEach(x=>reasons[x]=(reasons[x]||0)+1));
+  return {n:rs.length,m,group:yn("group_work"),bg:yn("background"),reasons,rs};
 }
 
 /* ---------- header ---------- */
@@ -227,7 +288,7 @@ function route(){const h=decodeURIComponent(location.hash.slice(1));
   if(h==="add")return renderAdd();
   if(h.startsWith("c-"))return renderCourse(h.slice(2));
   renderList();}
-window.addEventListener("hashchange",()=>{S.editing=false;route();window.scrollTo(0,0)});
+window.addEventListener("hashchange",()=>{S.editing=false;route();try{window.scrollTo(0,0)}catch(e){}});
 
 function statusNotice(){
   if(!sb)return `<p class="notice">This copy of beenrated isn't connected to a database yet. Add your Supabase project address and key to config.js.</p>`;
@@ -268,77 +329,107 @@ function renderSignIn(){
 function renderList(){
   const courses=[...S.courses.values()].map(c=>({...c,attrs:c.attrs||[],s:summary(c.id)}));
   const q=S.q.trim().toLowerCase().replace(/\s+/g," ");
-  const list=courses.filter(c=>(S.attr==="All"||c.attrs.includes(S.attr))&&(!q||`${c.dept} ${c.num} ${c.dept}${c.num} ${c.title}`.toLowerCase().includes(q)));
+  const quick=QUICK.filter(x=>S.quick.has(x.id));
+  const list=courses.filter(c=>(S.attr==="All"||c.attrs.includes(S.attr))&&quick.every(x=>x.test(c.s))&&(!q||`${c.dept} ${c.num} ${c.dept}${c.num} ${c.title}`.toLowerCase().includes(q)));
   const nz=(v,d)=>v==null?d:v;
-  const by={count:(a,b)=>b.s.n-a.s.n,again:(a,b)=>nz(b.s.m.again,-1)-nz(a.s.m.again,-1),easy:(a,b)=>nz(a.s.m.difficulty,9)-nz(b.s.m.difficulty,9),
-    light:(a,b)=>nz(a.s.m.work,9)-nz(b.s.m.work,9),exams:(a,b)=>nz(a.s.m.exams,9)-nz(b.s.m.exams,9),attend:(a,b)=>nz(a.s.m.attendance,9)-nz(b.s.m.attendance,9),code:()=>0};
+  const by={count:(a,b)=>b.s.n-a.s.n,again:(a,b)=>nz(b.s.m.again,-1)-nz(a.s.m.again,-1),taught:(a,b)=>nz(b.s.m.taught,-1)-nz(a.s.m.taught,-1),
+    interesting:(a,b)=>nz(b.s.m.interesting,-1)-nz(a.s.m.interesting,-1),hours:(a,b)=>nz(a.s.m.hours,9)-nz(b.s.m.hours,9),
+    workload:(a,b)=>nz(a.s.m.workload,9)-nz(b.s.m.workload,9),code:()=>0};
   list.sort((a,b)=>by[S.sort](a,b)||(a.dept+a.num).localeCompare(b.dept+b.num));
   const total=courses.reduce((t,c)=>t+c.s.n,0);
   app.innerHTML=`
   <section class="intro"><h1>Know the class before you take it.</h1>
-    <p>Duke students rate classes on difficulty, workload, exams, attendance and whether they'd take them again. <span class="mono">${courses.length}</span> ${courses.length===1?"class":"classes"} · <span class="mono">${total}</span> ${total===1?"rating":"ratings"}.</p></section>
+    <p>Duke students rate how well classes are taught, how interesting they are, how much work they take and whether they'd take them again. <span class="mono">${courses.length}</span> ${courses.length===1?"class":"classes"} · <span class="mono">${total}</span> ${total===1?"review":"reviews"}.</p></section>
   ${statusNotice()}
   <section class="controls">
     <input class="search" id="q" type="search" placeholder="Search by code or title, e.g. ECON 201 or linear algebra" value="${esc(S.q)}" aria-label="Search classes">
-    <span class="label">Filter by Arts &amp; Sciences code</span>
+    <span class="label">Arts &amp; Sciences code</span>
     <div class="row">
       ${["All",...ATTRS.map(x=>x[0])].map(a=>{const x=ATTRS.find(y=>y[0]===a);return `<button class="chip" type="button" data-attr="${esc(a)}" title="${esc(x?x[1]:"All classes")}" aria-pressed="${a===S.attr}">${a==="All"?"All":(a.length<=2?`<span class="mono">${a}</span> ${x[2]}`:x[2])}</button>`}).join("")}
+    </div>
+    <span class="label">Quick filters</span>
+    <div class="row">
+      ${QUICK.map(x=>`<button class="chip" type="button" data-quick="${x.id}" aria-pressed="${S.quick.has(x.id)}">${x.label}</button>`).join("")}
       <label class="sort">Sort
         <select id="sort">
-          <option value="count">Most rated</option><option value="again">Most would take again</option><option value="easy">Easiest</option>
-          <option value="light">Lightest workload</option><option value="exams">Fewest exams</option><option value="attend">Attendance least required</option><option value="code">Course code</option>
+          <option value="count">Most reviewed</option><option value="again">Most would take again</option><option value="taught">Best taught</option>
+          <option value="interesting">Most interesting</option><option value="hours">Fewest hours</option><option value="workload">Lightest workload</option><option value="code">Course code</option>
         </select></label>
     </div>
   </section>
   <section class="list" aria-label="Classes">
-    ${list.length?list.map(c=>`
-      <a class="item" href="#c-${encodeURIComponent(c.id)}">
-        <div class="stamp" style="--c:${againColor(c.s.m.again)}" title="Would take again, out of 5">${c.s.n?f1(c.s.m.again):"–"}<small>retake</small></div>
-        <div style="min-width:0">
-          <div class="code"><span>${esc(c.dept)} ${esc(c.num)}</span>${c.attrs.length?`<span class="attrs">${c.attrs.map(a=>`<span class="attr" title="${esc(attrName(a))}">${esc(attrBadge(a))}</span>`).join("")}</span>`:""}</div>
-          <div class="title">${esc(c.title)}</div>
-          ${c.s.n?`<div class="meta"><span>Difficulty <b class="mono">${f1(c.s.m.difficulty)}</b></span><span>Work <b class="mono">${f1(c.s.m.work)}</b></span><span>Exams <b class="mono">${f1(c.s.m.exams)}</b></span><span>Attendance <b class="mono">${f1(c.s.m.attendance)}</b></span></div>`:`<div class="meta"><span>No ratings yet. Be the first.</span></div>`}
-        </div>
-        <div class="count"><span class="mono">${c.s.n}</span> ${c.s.n===1?"rating":"ratings"}</div>
-      </a>`).join(""):emptyList(courses.length)}
+    ${list.length?list.map(listItem).join(""):emptyList(courses.length)}
   </section>`;
   document.getElementById("q").oninput=e=>{S.q=e.target.value;const pos=e.target.selectionStart;renderList();const n=document.getElementById("q");n.focus();n.setSelectionRange(pos,pos)};
   const so=document.getElementById("sort");so.value=S.sort;so.onchange=e=>{S.sort=e.target.value;renderList()};
   app.querySelectorAll("[data-attr]").forEach(b=>b.onclick=()=>{S.attr=b.dataset.attr;renderList()});
+  app.querySelectorAll("[data-quick]").forEach(b=>b.onclick=()=>{const id=b.dataset.quick;S.quick.has(id)?S.quick.delete(id):S.quick.add(id);renderList()});
   app.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{location.hash=canWrite()?"add":"signin"});
+}
+function listItem(c){
+  const s=c.s,m=s.m;
+  const facts=[];
+  if(m.taught!=null)facts.push(`Well taught <b class="mono">${f1(m.taught)}</b>`);
+  if(m.interesting!=null)facts.push(`Interesting <b class="mono">${f1(m.interesting)}</b>`);
+  if(m.hours!=null)facts.push(`<b class="mono">${hoursLabel(m.hours)}</b>/wk`);
+  if(m.workload!=null)facts.push(`Workload <b class="mono">${f1(m.workload)}</b>`);
+  const badges=QUICK.filter(x=>x.id!=="light-hours"&&x.test(s)).map(x=>`<span class="flag">${x.label}</span>`);
+  return `<a class="item" href="#c-${encodeURIComponent(c.id)}">
+    <div class="stamp" style="--c:${againColor(m.again)}" title="Would take again, out of 5">${m.again!=null?f1(m.again):"–"}<small>retake</small></div>
+    <div style="min-width:0">
+      <div class="code"><span>${esc(c.dept)} ${esc(c.num)}</span>${c.attrs.length?`<span class="attrs">${c.attrs.map(a=>`<span class="attr" title="${esc(attrName(a))}">${esc(attrBadge(a))}</span>`).join("")}</span>`:""}</div>
+      <div class="title">${esc(c.title)}</div>
+      ${s.n?(facts.length?`<div class="meta">${facts.map(f=>`<span>${f}</span>`).join("")}</div>`:""):`<div class="meta"><span>No reviews yet. Be the first.</span></div>`}
+      ${badges.length?`<div class="flags">${badges.join("")}</div>`:""}
+    </div>
+    <div class="count"><span class="mono">${s.n}</span> ${s.n===1?"review":"reviews"}</div>
+  </a>`;
 }
 function emptyList(n){
   if(!S.loaded||!sb)return "";
-  if(n)return `<div class="empty"><h3>No classes match</h3><p>Check the code or filter, or add the class so people can rate it.</p><button class="btn" data-add type="button">Add a class</button></div>`;
-  return `<div class="empty"><h3>No classes yet</h3><p>Add a class you've taken, then leave the first rating.</p><button class="btn primary" data-add type="button">Add the first class</button></div>`;
+  if(n)return `<div class="empty"><h3>No classes match</h3><p>Try removing a filter, or add the class so people can review it.</p><button class="btn" data-add type="button">Add a class</button></div>`;
+  return `<div class="empty"><h3>No classes yet</h3><p>Add a class you've taken, then leave the first review.</p><button class="btn primary" data-add type="button">Add the first class</button></div>`;
 }
 
 /* ---------- course ---------- */
+function ynSummary(o,yesText,noText){
+  if(!o)return `<span class="muted">No answers yet</span>`;
+  const p=Math.round(100*o.yes/o.n);
+  return `<b>${p>=50?yesText:noText}</b> <span class="muted">· ${o.yes} of ${o.n} said yes</span>`;
+}
 function renderCourse(id){
   const c=S.courses.get(id);
   if(!c){app.innerHTML=`<a class="back" href="#">← All classes</a>${S.loaded?`<div class="empty"><h3>Class not found</h3><p>It may have been removed.</p></div>`:statusNotice()}`;return}
-  const s=summary(id),attrs=c.attrs||[];
+  const s=summary(id),attrs=c.attrs||[],m=s.m;
   const mine=s.rs.find(r=>r.mine);
   const uses=[...new Set(s.rs.map(r=>(r.useful||"").trim()).filter(Boolean))];
+  const reasons=Object.entries(s.reasons).sort((a,b)=>b[1]-a[1]);
+  const evals=RATINGS.filter(x=>x.kind==="eval"),descs=RATINGS.filter(x=>x.kind==="desc");
+  const row=x=>`<div class="measure"><div class="name">${x.label}<small>${x.lo} → ${x.hi}</small></div>${dots(m[x.k],x.kind,"lg")}<span class="v">${valText(x.k,m[x.k])}</span></div>`;
   app.innerHTML=`
   <a class="back" href="#">← All classes</a>
   <section class="course-head">
-    <div class="stamp big" style="--c:${againColor(s.m.again)}">${s.n?f1(s.m.again):"–"}<small>retake</small></div>
+    <div class="stamp big" style="--c:${againColor(m.again)}">${m.again!=null?f1(m.again):"–"}<small>retake</small></div>
     <div style="min-width:0;display:flex;flex-direction:column;gap:6px">
       <div class="code">${esc(c.dept)} ${esc(c.num)}</div><h2>${esc(c.title)}</h2>
       <div class="row">
         ${attrs.length?`<div style="display:flex;flex-direction:column;gap:2px;width:100%;font-size:13px" class="muted">${attrs.map(a=>`<span><span class="attr">${esc(attrBadge(a))}</span> ${esc(attrName(a))}</span>`).join("")}</div>`:""}
         ${canWrite()?`<button class="btn small" id="editAttrs" type="button">${attrs.length?"Edit codes":"Add A&amp;S codes"}</button>`:attrs.length?"":`<span class="muted" style="font-size:13px">No codes listed</span>`}</div>
-      <div class="muted" style="font-size:14px"><span class="mono">${s.n}</span> ${s.n===1?"rating":"ratings"}</div>
+      <div class="muted" style="font-size:14px"><span class="mono">${s.n}</span> ${s.n===1?"review":"reviews"}</div>
     </div>
   </section>
   <section id="attrSlot"></section>
   ${statusNotice()}
-  ${s.n?`<section class="measures" aria-label="Average ratings">
-    ${MEASURES.map(x=>`<div class="measure"><div class="name">${x.label}<small>${x.lo} · ${x.hi}</small></div>${stars(s.m[x.k])}<span class="v">${f1(s.m[x.k])}</span></div>`).join("")}
+  ${s.n?`
+  <section class="measures" aria-label="Is it worth it"><span class="label">Is it worth it?</span>${evals.map(row).join("")}</section>
+  <section class="measures" aria-label="What it takes"><span class="label">What it takes</span>${descs.map(row).join("")}</section>
+  <section class="facts">
+    <div class="fact"><span class="label">Group work</span><div>${ynSummary(s.group,"Usually yes","Usually none")}</div></div>
+    <div class="fact"><span class="label">Background needed</span><div>${ynSummary(s.bg,"Usually yes","Usually not")}</div></div>
+    <div class="fact"><span class="label">Why people took it</span><div>${reasons.length?`<div class="useful">${reasons.map(([r,n])=>`<span>${esc(r)} <b class="mono">${n}</b></span>`).join("")}</div>`:`<span class="muted">No answers yet</span>`}</div></div>
   </section>
   ${uses.length?`<section style="display:flex;flex-direction:column;gap:8px"><span class="label">Useful for</span><div class="useful">${uses.map(u=>`<span>${esc(u)}</span>`).join("")}</div></section>`:""}`
-  :`<p class="muted" style="margin:0">Nobody has rated this class yet.</p>`}
+  :`<p class="muted" style="margin:0">Nobody has reviewed this class yet.</p>`}
   <section id="formSlot"></section>
   <section class="reviews" aria-label="Reviews">
     ${s.rs.length?`<h3 style="font-size:20px">Reviews</h3>`:""}
@@ -348,7 +439,7 @@ function renderCourse(id){
   if(canWrite()){
     if(mine&&!S.editing)slot.innerHTML=S.flash?`<p class="ok">${esc(S.flash)}</p>`:"";
     else renderRateForm(slot,id,c,mine);
-  }else if(sb&&!S.session)slot.innerHTML=signInPrompt("rate this class");
+  }else if(sb&&!S.session)slot.innerHTML=signInPrompt("review this class");
   S.flash="";
   const ea=document.getElementById("editAttrs");if(ea)ea.onclick=()=>renderAttrEditor(id,c);
   app.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>{S.editing=true;renderCourse(id);document.getElementById("formSlot").scrollIntoView({behavior:"smooth"})});
@@ -362,10 +453,20 @@ function renderCourse(id){
 
 function reviewCard(r){
   const d=new Date(r.updated_at||r.created_at).toLocaleDateString(undefined,{month:"short",year:"numeric"});
+  const rated=RATINGS.filter(x=>r[x.k]!=null);
+  const facts=[];
+  if(r.group_work===true)facts.push("Group work");if(r.group_work===false)facts.push("No group work");
+  if(r.background===true)facts.push("Background needed");if(r.background===false)facts.push("No background needed");
+  const notes=RATINGS.filter(x=>x.note&&r[x.note]).map(x=>[x.noteLabel,r[x.note]]);
+  if(r.background_note)notes.push(["Background",r.background_note]);
+  const reasons=(r.reasons||[]).join(", ");
+  if(reasons||r.reason_note)notes.push(["Took it for",[reasons,r.reason_note].filter(Boolean).join(". ")]);
   return `<article class="review ${r.mine?"mine":""}">
-    <div class="who"><b>Anonymous ${esc(r.year)}</b><span>${esc(d)}</span>${r.mine?`<span style="color:var(--accent);font-weight:600">Your review</span>`:""}</div>
-    <div class="minis">${MEASURES.map(x=>`<div class="mini"><span>${x.label}</span>${stars(Number(r[x.k]))}</div>`).join("")}</div>
-    <p>${esc(r.body)}</p>
+    <div class="who"><b>Anonymous ${esc(r.year||"student")}</b><span>${esc(d)}</span>${r.mine?`<span style="color:var(--accent);font-weight:600">Your review</span>`:""}</div>
+    ${rated.length?`<div class="minis">${rated.map(x=>`<div class="mini"><span>${x.label}</span><span class="minival">${dots(r[x.k],x.kind)}${x.k==="hours"?`<b class="mono">${HOURS[r.hours-1]} hrs</b>`:""}</span></div>`).join("")}</div>`:""}
+    ${facts.length?`<div class="useful">${facts.map(f=>`<span>${f}</span>`).join("")}</div>`:""}
+    ${r.body?`<p>${esc(r.body)}</p>`:""}
+    ${notes.length?`<dl class="notes">${notes.map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>`:""}
     ${r.useful?`<div class="uf"><b>Useful for:</b> ${esc(r.useful)}</div>`:""}
     ${r.mine&&canWrite()?`<div class="foot"><button class="btn small" data-edit type="button">Edit</button><button class="btn small danger" data-del type="button">Delete</button></div>`:""}
   </article>`;
@@ -402,44 +503,98 @@ function renderAttrEditor(id,c){
   };
 }
 
-/* ---------- rating form ---------- */
-function starPick(k,label,val){
-  return `<div class="starpick" role="radiogroup" aria-label="${label}">${[5,4,3,2,1].map(n=>`<input type="radio" name="${k}" id="${k}${n}" value="${n}" ${Number(val)===n?"checked":""}><label for="${k}${n}" title="${n} of 5">★</label>`).join("")}</div>`;
+/* ---------- review form ---------- */
+function dotPick(x,val){
+  return `<div class="dotpick ${x.kind}" role="radiogroup" aria-label="${x.label}">${[1,2,3,4,5].map(n=>`<input type="radio" name="${x.k}" id="${x.k}${n}" value="${n}" ${Number(val)===n?"checked":""}><label for="${x.k}${n}" title="${x.k==="hours"?HOURS[n-1]+" hrs":n+" of 5"}"><span class="sr">${x.k==="hours"?HOURS[n-1]+" hours":n+" of 5"}</span></label>`).join("")}</div>`;
+}
+function qRow(x,m){
+  const note=x.note?(m[x.note]||""):"";
+  return `<div class="qrow">
+    <div class="qhead"><span class="qname">${x.label}</span>
+      <div class="qpick">${dotPick(x,m[x.k])}<div class="ends"><span>${x.lo}</span><span>${x.hi}</span></div></div>
+      <output class="qval mono" id="${x.k}Out"></output></div>
+    ${x.note?`<button type="button" class="linkbtn" data-open="${x.note}" ${note?"hidden":""}>+ Describe</button>
+      <textarea class="note" id="${x.note}" maxlength="300" placeholder="${esc(x.ph)}" ${note?"":"hidden"}>${esc(note)}</textarea>`:""}
+  </div>`;
+}
+function ynPick(id,val){
+  return `<div class="yn" id="${id}" data-val="${val===true?"yes":val===false?"no":""}">${["Yes","No"].map(o=>`<button type="button" class="chip" id="${id}-${o.toLowerCase()}" data-v="${o.toLowerCase()}" aria-pressed="${val===(o==="Yes")}">${o}</button>`).join("")}</div>`;
 }
 function renderRateForm(slot,id,c,mine){
   const m=mine||{},yr=m.year||lastYear();
+  const evals=RATINGS.filter(x=>x.kind==="eval"),descs=RATINGS.filter(x=>x.kind==="desc");
   slot.innerHTML=`<form id="rate" novalidate>
-    <h3>${mine?"Edit your rating":"Rate "+esc(c.dept)+" "+esc(c.num)}</h3>
+    <div><h3>${mine?"Edit your review":"Review "+esc(c.dept)+" "+esc(c.num)}</h3>
+      <p class="hint" style="margin:6px 0 0">Every question is optional. Answer what you remember, then post.</p></div>
     <div class="field" style="max-width:260px"><label class="label" for="year">Your year</label>
-      <select id="year"><option value="">Choose your year</option>${YEARS.map(y=>`<option ${y===yr?"selected":""}>${y}</option>`).join("")}</select>
-      <span class="hint">Your review shows as “Anonymous ${esc(yr||"2nd year")}”. Nothing else about you is shown.</span></div>
-    <div class="field"><span class="label">Ratings, out of 5 stars</span>
-      <div>${MEASURES.map(x=>`<div class="pickrow"><div class="name">${x.label}<small>${x.lo} · ${x.hi}</small></div>${starPick(x.k,x.label,m[x.k])}</div>`).join("")}</div></div>
-    <div class="field"><label class="label" for="text">Short review</label>
-      <textarea id="text" maxlength="500" placeholder="What should someone know before signing up?">${esc(m.body)}</textarea>
-      <span class="hint" id="count"></span></div>
-    <div class="field"><label class="label" for="useful">Useful for</label>
-      <input type="text" id="useful" maxlength="100" value="${esc(m.useful)}" placeholder="e.g. Econ major, pre-law, finance recruiting"></div>
+      <select id="year"><option value="">Prefer not to say</option>${YEARS.map(y=>`<option ${y===yr?"selected":""}>${y}</option>`).join("")}</select>
+      <span class="hint">Your review shows as “Anonymous ${esc(yr||"student")}”. Nothing else about you is shown.</span></div>
+    <fieldset><legend class="label">Is it worth it?</legend>${evals.map(x=>qRow(x,m)).join("")}</fieldset>
+    <fieldset><legend class="label">What it takes</legend>${descs.map(x=>qRow(x,m)).join("")}</fieldset>
+    <fieldset><legend class="label">Quick questions</legend>
+      <div class="qrow"><div class="qhead"><span class="qname">Group work?</span>${ynPick("group_work",m.group_work)}</div></div>
+      <div class="qrow"><div class="qhead"><span class="qname">Background needed?</span>${ynPick("background",m.background)}</div>
+        <textarea class="note" id="background_note" maxlength="300" placeholder="What should you know first? e.g. comfortable with calculus, took ECON 101" ${m.background===true||m.background_note?"":"hidden"}>${esc(m.background_note)}</textarea></div>
+      <div class="qrow"><span class="qname">Why did you take it?</span>
+        <div class="row">${REASONS.map((r,i)=>`<button type="button" class="chip" id="reason${i}" data-reason="${esc(r)}" aria-pressed="${(m.reasons||[]).includes(r)}">${esc(r)}</button>`).join("")}</div>
+        <input type="text" class="note" id="reason_note" maxlength="200" placeholder="Anything to add? e.g. needed it for the Econ major, friend recommended it" value="${esc(m.reason_note)}"></div>
+    </fieldset>
+    <fieldset><legend class="label">In your words</legend>
+      <div class="field"><label class="qname" for="text">Short review</label>
+        <textarea id="text" maxlength="500" placeholder="What should someone know before signing up?">${esc(m.body)}</textarea>
+        <span class="hint" id="count"></span></div>
+      <div class="field"><label class="qname" for="useful">Useful for</label>
+        <input type="text" id="useful" maxlength="100" value="${esc(m.useful)}" placeholder="e.g. Econ major, pre-law, finance recruiting"></div>
+    </fieldset>
     <p class="err" id="formErr" hidden></p>
     <div class="actions"><button class="btn primary" type="submit" id="submitBtn">${mine?"Save changes":"Post anonymously"}</button>${mine?`<button class="btn" type="button" id="cancelEdit">Cancel</button>`:""}</div>
   </form>`;
-  const ta=slot.querySelector("#text"),ct=slot.querySelector("#count");
+  const f=slot.querySelector("#rate");
+  // dot scales: fill up to the chosen dot, tap the chosen dot again to clear
+  RATINGS.forEach(x=>{
+    const inputs=[...f.querySelectorAll(`[name=${x.k}]`)],out=f.querySelector(`#${x.k}Out`);
+    const paint=()=>{const v=Number((inputs.find(i=>i.checked)||{}).value||0);
+      inputs.forEach((i,n)=>i.nextElementSibling.classList.toggle("on",n<v));
+      out.textContent=v?(x.k==="hours"?HOURS[v-1]+" hrs":v+"/5"):"";};
+    inputs.forEach(i=>{
+      i.addEventListener("pointerdown",()=>{i.dataset.was=i.checked?"1":""});
+      i.nextElementSibling.addEventListener("pointerdown",()=>{i.dataset.was=i.checked?"1":""});
+      i.addEventListener("click",()=>{if(i.dataset.was==="1"){i.checked=false;i.dataset.was=""}paint()});
+      i.addEventListener("change",paint);
+    });
+    paint();
+  });
+  f.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>{b.hidden=true;const t=f.querySelector("#"+b.dataset.open);t.hidden=false;t.focus()});
+  f.querySelectorAll(".yn").forEach(g=>g.querySelectorAll("button").forEach(b=>b.onclick=()=>{
+    const on=b.getAttribute("aria-pressed")==="true";
+    g.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed","false"));
+    if(!on)b.setAttribute("aria-pressed","true");
+    g.dataset.val=on?"":b.dataset.v;
+    if(g.id==="background"){const t=f.querySelector("#background_note");t.hidden=g.dataset.val!=="yes"&&!t.value}
+  }));
+  f.querySelectorAll("[data-reason]").forEach(b=>b.onclick=()=>b.setAttribute("aria-pressed",String(b.getAttribute("aria-pressed")!=="true")));
+  const ta=f.querySelector("#text"),ct=f.querySelector("#count");
   const cnt=()=>ct.textContent=`${ta.value.length} / 500`;cnt();ta.oninput=cnt;
-  const ce=slot.querySelector("#cancelEdit");if(ce)ce.onclick=()=>{S.editing=false;renderCourse(id)};
-  slot.querySelector("#rate").onsubmit=async e=>{
-    e.preventDefault();const f=e.target,err=f.querySelector("#formErr");
-    const year=f.querySelector("#year").value,v={},missing=[];
-    if(!year)missing.push("your year");
-    MEASURES.forEach(x=>{const el=f.querySelector(`[name=${x.k}]:checked`);if(el)v[x.k]=Number(el.value);else missing.push(x.label.toLowerCase())});
-    const body=ta.value.trim().slice(0,500);if(!body)missing.push("a short review");
-    if(missing.length){err.textContent="Add "+missing.join(", ")+" before posting.";err.hidden=false;return}
-    saveYear(year);
+  const ce=f.querySelector("#cancelEdit");if(ce)ce.onclick=()=>{S.editing=false;renderCourse(id)};
+  f.onsubmit=async e=>{
+    e.preventDefault();const err=f.querySelector("#formErr");
+    const yn=k=>{const v=f.querySelector("#"+k).dataset.val;return v==="yes"?true:v==="no"?false:null};
+    const p={year:f.querySelector("#year").value};
+    RATINGS.forEach(x=>{const el=f.querySelector(`[name=${x.k}]:checked`);p[x.k]=el?Number(el.value):null;
+      if(x.note)p[x.note]=f.querySelector("#"+x.note).value.trim().slice(0,300)});
+    p.group_work=yn("group_work");p.background=yn("background");
+    p.background_note=f.querySelector("#background_note").value.trim().slice(0,300);
+    p.reasons=[...f.querySelectorAll('[data-reason][aria-pressed="true"]')].map(b=>b.dataset.reason);
+    p.reason_note=f.querySelector("#reason_note").value.trim().slice(0,200);
+    p.body=ta.value.trim().slice(0,500);p.useful=f.querySelector("#useful").value.trim().slice(0,100);
+    const answered=RATINGS.some(x=>p[x.k]!=null)||p.group_work!=null||p.background!=null||p.body;
+    if(!answered){err.textContent="Add at least one rating or a few words before posting.";err.hidden=false;return}
+    saveYear(p.year);
     const btn=f.querySelector("#submitBtn");btn.disabled=true;btn.textContent="Posting…";
-    const {error}=await sb.rpc("submit_review",{p_course_id:id,p_year:year,p_difficulty:v.difficulty,p_work:v.work,p_exams:v.exams,
-      p_attendance:v.attendance,p_again:v.again,p_body:body,p_useful:f.querySelector("#useful").value.trim().slice(0,100)});
+    const {error}=await sb.rpc("submit_review",{p_course_id:id,p});
     if(error){btn.disabled=false;btn.textContent="Try again";err.hidden=false;
-      err.textContent=/duke/i.test(error.message)?error.message:"Couldn't save your rating. Check your connection and try again.";return}
-    S.editing=false;S.flash="Rating posted. Thanks for helping other students.";
+      err.textContent=/duke/i.test(error.message)?error.message:"Couldn't save your review. Check your connection and try again.";return}
+    S.editing=false;S.flash="Review posted. Thanks for helping other students.";
     await loadAll();
   };
 }
